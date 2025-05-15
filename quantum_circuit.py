@@ -5,7 +5,7 @@ import numpy as np
 
 # TODO: make a base simulator abstract class
 class BasicSimulator:
-    def __init__(self, qc: QuantumCircuit):
+    def __init__(self, qc: "QuantumCircuit"):
         # quantum circuit we want to run
         self.qc = qc
 
@@ -33,15 +33,16 @@ class Gate:
 
 
 class QuantumCircuit:
-    def __init__(self, qreg: QuantumRegister, creg: ClassicalRegister):
+    def __init__(self, qreg: "QuantumRegister", creg: "ClassicalRegister"):
         self.qreg = qreg
         self.creg = creg
 
-        self.gates: list[Gate] = []
+        # list of gates and the list of qubit indices they are applying to
+        self.gates: list[tuple] = []
 
 
-    def apply(self, gate: Gate):
-        pass
+    def apply(self, gate: Gate, qubits: list[int]):
+        self.gates.append((gate, qubits))
     
 
 
@@ -54,8 +55,8 @@ class QuantumRegister:
 
 
 class ClassicalRegister:
-    def __init__(self, bit: int):
-        self.bits = bits
+    def __init__(self, bits: int):
+        self.bits = bin(bits)
 
 
 class Gate:
@@ -66,6 +67,21 @@ class Gate:
         # TODO: make sure unitary
         self.qubits = qubits
         self.amplitudes = amplitudes
+
+    def mult(self, other: "Gate") -> Gate:
+        assert self.qubits == other.qubits
+        new_gate_amplitudes = self.amplitudes @ other.amplitudes
+        return Gate(self.qubits, new_gate_amplitudes)
+
+    def __matmul__(self, other):
+        if not isinstance(other, Gate):
+            raise ValueError(f"Cannot mulitply gate by {type(other)}")
+        return self.mult(other)
+    
+    def tensor(self, other: "Gate"):
+        new_gate_amplitudes = np.kron(self.amplitudes, other.amplitudes)
+        new_gate_qubits = self.qubits + other.qubits
+        return Gate(new_gate_qubits, new_gate_amplitudes)
 
     def i():
         id_gate = Gate(1, np.array([[1., 0.], [0., 1.]]))
@@ -82,3 +98,4 @@ class Gate:
     def h():
         h_gate = Gate(1, (1 / np.sqrt(2)) * np.array([[1., 1.], [1., -1.]]))
         return h_gate
+    
